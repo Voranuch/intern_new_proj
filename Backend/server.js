@@ -166,7 +166,6 @@ app.get('/users', async (req, res) => {
 });
 
 
-
 app.get('/users/:id', async (req, res) => {
   const userId = req.params.id;
   const query = "SELECT * FROM users WHERE id = ?";
@@ -237,6 +236,61 @@ app.put('/users/:id', async (req, res) => {
   });
 });
 
+app.post("/users", async (req, res) => {
+  try {
+    const { username, firstname, lastname, email, password, role_id } = req.body;
+
+    if (!username || !firstname || !lastname || !email || !password || !role_id) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const insertQuery = `
+      INSERT INTO users (username, firstname, lastname, email, password, role_id, created_at, updated_at) 
+      VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
+    `;
+
+    db.query(insertQuery, [username, firstname, lastname, email, hashedPassword, role_id], (err, result) => {
+      if (err) {
+        console.error("Error inserting user:", err);
+        return res.status(500).json({ message: "Database error", error: err.sqlMessage });
+      }
+
+      const newUserId = result.insertId;
+
+      const selectQuery = "SELECT * FROM users WHERE id = ?";
+      db.query(selectQuery, [newUserId], (err, userResult) => {
+        if (err) {
+          console.error("Error fetching new user:", err);
+          return res.status(500).json({ message: "Error fetching new user" });
+        }
+
+        if (userResult.length === 0) {
+          return res.status(404).json({ message: "User not found after creation" });
+        }
+
+        const newUser = userResult[0];
+
+        res.status(201).json({
+          data: {
+            id: newUser.id,  // ✅ Make sure 'id' is included
+            username: newUser.username,
+            firstname: newUser.firstname,
+            lastname: newUser.lastname,
+            email: newUser.email,
+            role_id: newUser.role_id,
+            created_at: newUser.created_at,
+            updated_at: newUser.updated_at
+          }
+        });
+      });
+    });
+  } catch (error) {
+    console.error("Unexpected error:", error.message);
+    res.status(500).json({ message: "Internal server error", error: error.message });
+  }
+});
 
 
 app.get('/model', async (req, res) => {
