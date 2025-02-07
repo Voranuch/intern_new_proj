@@ -102,13 +102,21 @@ export const dataProvider: DataProvider = {
   // Create a new record
   create: async (resource, params) => {
     try {
-      const { data } = await axios.post(`${API_URL}/${resource}`, params.data);
-      return { data };
+        const { data } = await axios.post(`${API_URL}/${resource}`, params.data);
+
+        // Ensure the response has an 'id'
+        if (!data.data?.id) {
+            throw new Error('Invalid API response: missing id field');
+        }
+
+        return { data: data.data }; // ✅ Ensure correct response format
     } catch (error) {
-      console.error(`Error creating ${resource}:`, error);
-      throw new Error('Failed to create record');
+        console.error(`Error creating ${resource}:`, error);
+        throw new Error('Failed to create record');
     }
-  },
+},
+
+
 
   // Update an existing record
   update: async (resource, params) => {
