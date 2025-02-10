@@ -292,6 +292,89 @@ app.post("/users", async (req, res) => {
   }
 });
 
+app.delete('/users', async (req, res) => {
+  const { userIds } = req.body; // Expecting an array of user IDs
+
+  if (!Array.isArray(userIds) || userIds.length === 0) {
+    return res.status(400).json({ message: "Invalid request, provide an array of user IDs" });
+  }
+
+  const deleteQuery = `DELETE FROM users WHERE id IN (?)`;
+  try {
+    db.query(deleteQuery, [userIds], (err, result) => {
+      if (err) {
+        return res.status(500).json({ message: 'Error deleting user', error: err.sqlMessage });
+      }
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      const maxIdQuery = 'SELECT MAX(id) AS maxId FROM users';
+        db.query(maxIdQuery, (err, maxResult) => {
+          if (err) {
+            return res.status(500).json({ message: 'Error fetching max ID', error: err.sqlMessage });
+          }
+
+          const newAutoIncrement = (maxResult[0].maxId || 0) + 1;
+
+          // Step 3: Reset AUTO_INCREMENT
+          const resetQuery = `ALTER TABLE users AUTO_INCREMENT = ${newAutoIncrement}`;
+          db.query(resetQuery, (err) => {
+            if (err) {
+              return res.status(500).json({ message: 'Error resetting auto-increment', error: err.sqlMessage });
+            }
+
+            res.json({ message: 'User deleted and AUTO_INCREMENT reset successfully' });
+          });
+        });
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Internal server error', error: error.message });
+  }
+});
+
+app.delete('/users/:id', async (req, res) => {
+  const userId = req.params.id;
+
+  try {
+    // Step 1: Delete the user
+    const deleteQuery = 'DELETE FROM users WHERE id = ?';
+    db.query(deleteQuery, [userId], async (err, result) => {
+      if (err) {
+        return res.status(500).json({ message: 'Error deleting user', error: err.sqlMessage });
+      }
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      // Step 2: Get the highest existing ID
+      const maxIdQuery = 'SELECT MAX(id) AS maxId FROM users';
+      db.query(maxIdQuery, (err, maxResult) => {
+        if (err) {
+          return res.status(500).json({ message: 'Error fetching max ID', error: err.sqlMessage });
+        }
+
+        const newAutoIncrement = (maxResult[0].maxId || 0) + 1;
+
+        // Step 3: Reset AUTO_INCREMENT
+        const resetQuery = `ALTER TABLE users AUTO_INCREMENT = ${newAutoIncrement}`;
+        db.query(resetQuery, (err) => {
+          if (err) {
+            return res.status(500).json({ message: 'Error resetting auto-increment', error: err.sqlMessage });
+          }
+
+          res.json({ message: 'User deleted and AUTO_INCREMENT reset successfully' });
+        });
+      });
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Internal server error', error: error.message });
+  }
+});
+
+
 
 app.get('/model', async (req, res) => {
   const page = parseInt(req.query.page) || 1;
@@ -336,6 +419,159 @@ app.get('/model/:model_id', async (req, res) => {
   });
 });
 
+app.get('/model/latest-id', async (req, res) => {
+  try {
+    const query = 'SELECT MAX(model_id) AS latest_id FROM model';
+    db.query(query, (err, result) => {
+      if (err) {
+        console.error("Error fetching latest model ID:", err);
+        return res.status(500).json({ message: "Database error", error: err.message || err.sqlMessage });
+      }
+
+      if (result.length === 0 || result[0].latest_id == null) {
+        return res.status(404).json({ message: "No models found" });
+      }
+
+      // Send back the latest model ID
+      res.status(200).json({ id: result[0].latest_id });
+    });
+  } catch (error) {
+    console.error("Unexpected error:", error.message);
+    res.status(500).json({ message: "Internal server error", error: error.message });
+  }
+});
+
+
+app.post('/model', async (req, res) => {
+  try{
+  const { model_num } = req.body;
+
+  if (!model_num) {
+    return res.status(400).json({ message: "Model number is required" });
+  }
+
+  const insertQuery = `INSERT INTO model (model_num) VALUES (?)`;
+
+  db.query(insertQuery, [model_num], (err, result) => {
+    if (err) {
+      console.error("Error inserting model:", err);
+      return res.status(500).json({ message: "Database error", error: err.message || err.sqlMessage });
+    }
+
+    const newModelId = result.insertId;
+
+    const selectQuery = "SELECT * FROM model WHERE model_id = ?";
+    db.query(selectQuery, [newModelId], (err, modelResult) => {
+      if (err) {
+        console.error("Error fetching new model:", err);
+        return res.status(500).json({ message: "Error fetching new model", error: err.message || err.sqlMessage });
+      }
+
+      if (modelResult.length === 0) {
+        return res.status(404).json({ message: "Model not found after creation" });
+      }
+
+      const newmodel = modelResult[0];
+
+      // Ensure the response format is correct
+      res.status(201).json({
+        data: {
+          id: newmodel.model_id, // Make sure you are sending 'id' here
+          model_num: newmodel.model_num
+        }
+      });
+    });
+  });
+}catch(error){
+  console.error("Unexpected error:", error.message);
+  res.status(500).json({ message: "Internal server error", error: error.message });
+}
+});
+
+
+app.delete('/model', async (req, res) => {
+  const { modelIds } = req.body; // Expecting an array of model IDs
+
+  if (!Array.isArray(modelIds) || modelIds.length === 0) {
+    return res.status(400).json({ message: "Invalid request, provide an array of model IDs" });
+  }
+
+  const deleteQuery = `DELETE FROM model WHERE model_id IN (?)`;
+  try {
+    db.query(deleteQuery, [modelIds], (err, result) => {
+      if (err) {
+        return res.status(500).json({ message: 'Error deleting model', error: err.sqlMessage });
+      }
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ message: 'Model not found' });
+      }
+
+      const maxIdQuery = 'SELECT MAX(model_id) AS maxId FROM model';
+        db.query(maxIdQuery, (err, maxResult) => {
+          if (err) {
+            return res.status(500).json({ message: 'Error fetching max ID', error: err.sqlMessage });
+          }
+
+          const newAutoIncrement = (maxResult[0].maxId || 0) + 1;
+
+          // Step 3: Reset AUTO_INCREMENT
+          const resetQuery = `ALTER TABLE model AUTO_INCREMENT = ${newAutoIncrement}`;
+          db.query(resetQuery, (err) => {
+            if (err) {
+              return res.status(500).json({ message: 'Error resetting auto-increment', error: err.sqlMessage });
+            }
+
+            res.json({ message: 'Model deleted and AUTO_INCREMENT reset successfully' });
+          });
+        });
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Internal server error', error: error.message });
+  }
+});
+
+
+// Delete a model by ID
+app.delete('/model/:model_id', async (req, res) => {
+  const modelId = req.params.model_id;
+
+  try {
+    // Step 1: Delete the user
+    const deleteQuery = 'DELETE FROM model WHERE model_id = ?';
+    db.query(deleteQuery, [modelId], async (err, result) => {
+      if (err) {
+        return res.status(500).json({ message: 'Error deleting model', error: err.sqlMessage });
+      }
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ message: 'Model not found' });
+      }
+
+      // Step 2: Get the highest existing ID
+      const maxIdQuery = 'SELECT MAX(model_id) AS maxId FROM model';
+      db.query(maxIdQuery, (err, maxResult) => {
+        if (err) {
+          return res.status(500).json({ message: 'Error fetching max ID', error: err.sqlMessage });
+        }
+
+        const newAutoIncrement = (maxResult[0].maxId || 0) + 1;
+
+        // Step 3: Reset AUTO_INCREMENT
+        const resetQuery = `ALTER TABLE model AUTO_INCREMENT = ${newAutoIncrement}`;
+        db.query(resetQuery, (err) => {
+          if (err) {
+            return res.status(500).json({ message: 'Error resetting auto-increment', error: err.sqlMessage });
+          }
+
+          res.json({ message: 'Model deleted and AUTO_INCREMENT reset successfully' });
+        });
+      });
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Internal server error', error: error.message });
+  }
+});
 
 app.get('/roles', async (req, res) => {
   const query = "SELECT * FROM roles";
@@ -352,9 +588,6 @@ app.get('/roles', async (req, res) => {
     });
   });
 });
-
-
-
 
 app.post("/api/register", async (req, res) => {
   const { name,firstname, lastname,  email, password } = req.body;
