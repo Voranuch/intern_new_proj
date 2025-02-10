@@ -50,7 +50,10 @@ export const dataProvider: DataProvider = {
       } else if (resource === 'users') {
         // For users, we expect a different response structure
         data = response.data.data || response.data;
-      } else {
+      } else if (resource === 'bea') {
+        // For users, we expect a different response structure
+        data = response.data.data || response.data;
+      }else {
         // If the resource is something else, you might want to adjust accordingly
         data = response.data.data || response.data;
       }
@@ -62,7 +65,7 @@ export const dataProvider: DataProvider = {
       // Map the data to ensure consistency
       const mappedData = data.map((item: any) => ({
         ...item,
-        id: item.id || item.model_id, // Handle different possible ID field names
+        id: item.id || item.model_id || item.bea_packing_no, // Handle different possible ID field names
       }));
   
       return {
@@ -80,11 +83,22 @@ export const dataProvider: DataProvider = {
       const url = `${API_URL}/${resource}/${params.id}`;
       const { data } = await axios.get(url);
   
+      // Log the raw response to inspect the structure
+      console.log('Fetched data:', data);
+  
       if (resource === 'model') {
         if (!data.model_id) {
           throw new Error('Model does not have a model_id field');
         }
-        data.id = data.model_id; // Map 'model_id' to 'id' for consistency
+        data.id = data.model_id;
+      } else if (resource === 'bea') {
+        // Ensure that the data is in the expected structure (array within `data`)
+        if (!data.bea_packing_no) {
+          throw new Error('BEA does not have a bea_packing_no field');
+        }
+        data.id = data.bea_packing_no;
+  
+        return { data };
       } else {
         if (!data.id) {
           throw new Error('Record does not have an id field');
@@ -99,6 +113,7 @@ export const dataProvider: DataProvider = {
   },
   
   
+  
   // Create a new record
   create: async (resource, params) => {
     try {
@@ -109,7 +124,7 @@ export const dataProvider: DataProvider = {
             throw new Error('Invalid API response: missing id field');
         }
 
-        return { data: data.data }; // ✅ Ensure correct response format
+        return { data: data.data };
     } catch (error) {
         console.error(`Error creating ${resource}:`, error);
         throw new Error('Failed to create record');
@@ -124,7 +139,6 @@ export const dataProvider: DataProvider = {
     // Ensure that the response is wrapped in a 'data' object
     return { data: data.data }; 
   },
-  
   // Delete a single record
 delete: async <RecordType extends RaRecord>(
   resource: string,
@@ -133,6 +147,8 @@ delete: async <RecordType extends RaRecord>(
   try {
     if (resource === 'model') {
       await axios.delete(`${API_URL}/model/${params.id}`);
+    } else if (resource === 'bea') {
+      await axios.delete(`${API_URL}/bea_packing/${params.id}`);
     } else if (resource === 'users') {
       await axios.delete(`${API_URL}/users/${params.id}`);
     } else {
@@ -154,6 +170,8 @@ deleteMany: async <RecordType extends RaRecord>(
   try {
     if (resource === 'model') {
       await axios.delete(`${API_URL}/model`, { data: { modelIds: params.ids } });
+    } else if (resource === 'bea') {
+      await axios.delete(`${API_URL}/bea`, { data: { beaId: params.ids } });
     } else if (resource === 'users') {
       await axios.delete(`${API_URL}/users`, { data: { userIds: params.ids } });
     } else {
