@@ -116,8 +116,6 @@ export const dataProvider: DataProvider = {
     }
 },
 
-
-
   // Update an existing record
   update: async (resource, params) => {
     const { data } = await axios.put(`${API_URL}/${resource}/${params.id}`, params.data);
@@ -126,8 +124,6 @@ export const dataProvider: DataProvider = {
     // Ensure that the response is wrapped in a 'data' object
     return { data: data.data }; 
   },
-  
-  
   
   // Delete a single record
 delete: async <RecordType extends RaRecord>(
