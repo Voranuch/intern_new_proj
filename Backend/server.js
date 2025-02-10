@@ -236,6 +236,7 @@ app.put('/users/:id', async (req, res) => {
   });
 });
 
+
 app.post("/users", async (req, res) => {
   try {
     const { username, firstname, lastname, email, password, role_id } = req.body;
@@ -419,27 +420,60 @@ app.get('/model/:model_id', async (req, res) => {
   });
 });
 
-app.get('/model/latest-id', async (req, res) => {
-  try {
-    const query = 'SELECT MAX(model_id) AS latest_id FROM model';
-    db.query(query, (err, result) => {
-      if (err) {
-        console.error("Error fetching latest model ID:", err);
-        return res.status(500).json({ message: "Database error", error: err.message || err.sqlMessage });
-      }
+app.put('/model/:model_id', async (req, res) => {
+  const modelId = req.params.model_id;
+  const { model_num } = req.body;
 
-      if (result.length === 0 || result[0].latest_id == null) {
-        return res.status(404).json({ message: "No models found" });
-      }
-
-      // Send back the latest model ID
-      res.status(200).json({ id: result[0].latest_id });
-    });
-  } catch (error) {
-    console.error("Unexpected error:", error.message);
-    res.status(500).json({ message: "Internal server error", error: error.message });
+  if (!model_num) {
+    return res.status(400).json({ message: "model_num is required" });
   }
+
+  // Optional: Validate model_num format (e.g., number or string length)
+  if (typeof model_num !== 'string' || model_num.trim().length === 0) {
+    return res.status(400).json({ message: "Invalid model_num format" });
+  }
+
+  // Update query, passing model_num and modelId
+  const updateQuery = `
+    UPDATE model
+    SET model_num = ? WHERE model_id = ?;
+  `;
+
+  db.query(updateQuery, [model_num, modelId], (err, result) => {
+    if (err) {
+      console.error("Error updating model:", err);
+      return res.status(500).json({ message: "Error updating model", error: err.message });
+    }
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "Model not found" });
+    }
+
+    // Optionally fetch and return the updated model to ensure accuracy
+    const fetchQuery = `
+      SELECT * FROM model WHERE model_id = ?;
+    `;
+
+    db.query(fetchQuery, [modelId], (fetchErr, fetchResult) => {
+      if (fetchErr) {
+        console.error("Error fetching updated model:", fetchErr);
+        return res.status(500).json({ message: "Error fetching updated model", error: fetchErr.message });
+      }
+
+      const updatedModel = fetchResult[0];
+
+      // Ensure the response has an 'id' field, and return the updated model
+      res.json({
+        data: {
+          id: updatedModel.model_id, // Ensure 'id' is included
+          model_num: updatedModel.model_num, // Add other fields if needed
+        }
+      });
+    });
+  });
 });
+
+
 
 
 app.post('/model', async (req, res) => {
