@@ -129,33 +129,47 @@ export const dataProvider: DataProvider = {
   
   
   
-  // Delete a record
-  delete: async <RecordType extends RaRecord>(
-    resource: string,
-    params: DeleteParams<RecordType>
-  ): Promise<DeleteResult<RecordType>> => {
-    try {
-      await axios.delete(`${API_URL}/${resource}/${params.id}`);
-      return { data: params.previousData! }; // Ensure previousData is defined
-    } catch (error) {
-      console.error(`Error deleting ${resource}:`, error);
-      throw new Error('Failed to delete record');
+  // Delete a single record
+delete: async <RecordType extends RaRecord>(
+  resource: string,
+  params: DeleteParams<RecordType>
+): Promise<DeleteResult<RecordType>> => {
+  try {
+    if (resource === 'model') {
+      await axios.delete(`${API_URL}/model/${params.id}`);
+    } else if (resource === 'users') {
+      await axios.delete(`${API_URL}/users/${params.id}`);
+    } else {
+      throw new Error(`Unsupported resource: ${resource}`);
     }
-  },
 
-  // Delete multiple records
-  deleteMany: async <RecordType extends RaRecord>(
-    resource: string,
-    params: DeleteManyParams<RecordType>
-  ): Promise<DeleteManyResult<RecordType>> => {
-    try {
-      await Promise.all(params.ids.map((id) => axios.delete(`${API_URL}/${resource}/${id}`)));
-      return { data: params.ids };
-    } catch (error) {
-      console.error(`Error deleting multiple records from ${resource}:`, error);
-      throw new Error('Failed to delete multiple records');
+    return { data: params.previousData! }; // Ensure previousData is defined
+  } catch (error) {
+    console.error(`Error deleting ${resource}:`, error);
+    throw new Error('Failed to delete record');
+  }
+},
+
+// Delete multiple records
+deleteMany: async <RecordType extends RaRecord>(
+  resource: string,
+  params: DeleteManyParams<RecordType>
+): Promise<DeleteManyResult<RecordType>> => {
+  try {
+    if (resource === 'model') {
+      await axios.delete(`${API_URL}/model`, { data: { modelIds: params.ids } });
+    } else if (resource === 'users') {
+      await axios.delete(`${API_URL}/users`, { data: { userIds: params.ids } });
+    } else {
+      throw new Error(`Unsupported resource: ${resource}`);
     }
-  },
+
+    return { data: params.ids };
+  } catch (error) {
+    console.error(`Error deleting multiple records from ${resource}:`, error);
+    throw new Error('Failed to delete multiple records');
+  }
+},
 
   // Fetch multiple records by IDs
   getMany: async (resource, params) => {
