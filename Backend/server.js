@@ -375,8 +375,6 @@ app.delete('/users/:id', async (req, res) => {
   }
 });
 
-
-
 app.get('/model', async (req, res) => {
   const page = parseInt(req.query.page) || 1;
   const perPage = parseInt(req.query.perPage) || 10;
@@ -473,9 +471,6 @@ app.put('/model/:model_id', async (req, res) => {
   });
 });
 
-
-
-
 app.post('/model', async (req, res) => {
   try{
   const { model_num } = req.body;
@@ -522,7 +517,6 @@ app.post('/model', async (req, res) => {
 }
 });
 
-
 app.delete('/model', async (req, res) => {
   const { modelIds } = req.body; // Expecting an array of model IDs
 
@@ -565,7 +559,6 @@ app.delete('/model', async (req, res) => {
   }
 });
 
-
 // Delete a model by ID
 app.delete('/model/:model_id', async (req, res) => {
   const modelId = req.params.model_id;
@@ -599,6 +592,218 @@ app.delete('/model/:model_id', async (req, res) => {
           }
 
           res.json({ message: 'Model deleted and AUTO_INCREMENT reset successfully' });
+        });
+      });
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Internal server error', error: error.message });
+  }
+});
+
+app.get('/bea', async (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const perPage = parseInt(req.query.perPage) || 10;
+  const bea_packing_name = req.query.bea_packing_name || '';  // Capture the search query for bea_packing_name
+
+  const offset = (page - 1) * perPage;
+
+  const query = `SELECT * FROM bea_packing WHERE bea_packing_name LIKE ? LIMIT ${perPage} OFFSET ${offset}`;
+  const searchPattern = `%${bea_packing_name}%`;  // SQL wildcard for partial match
+
+  db.query(query, [searchPattern], (err, result) => {
+    if (err) return res.json({ Message: "Error inside server" });
+
+    const totalQuery = `SELECT COUNT(*) AS total FROM bea_packing WHERE bea_packing_name LIKE ?`;
+    
+    db.query(totalQuery, [searchPattern], (err, totalResult) => {
+      if (err) return res.json({ Message: "Error fetching total records" });
+
+      const total = totalResult[0].total;
+
+      // Return the filtered, paginated data and the total count
+      res.json({
+        data: result,
+        total: total
+      });
+    });
+  });
+});
+
+app.get('/bea/:bea_packing_no', async (req, res) => {
+  const { bea_packing_no } = req.params;  // Ensure you extract 'model_id' correctly
+  const query = `SELECT * FROM bea_packing WHERE bea_packing_no = ?`;  // Use model_id in the query
+
+  db.query(query, [bea_packing_no], (err, result) => {
+    if (err) return res.json({ Message: "Error inside server" });
+    if (result.length === 0) return res.status(404).json({ Message: "Model not found" });
+    res.json(result[0]);  // Return the model data
+  });
+});
+
+app.put('/bea/:bea_packing_no', async (req, res) => {
+  const beaId = req.params.bea_packing_no;
+  const { bea_packing_name } = req.body;
+
+  if (!bea_packing_name) {
+    return res.status(400).json({ message: "bea is required" });
+  }
+  if (typeof bea_packing_name !== 'string' || bea_packing_name.trim().length === 0) {
+    return res.status(400).json({ message: "Invalid bea format" });
+  }
+  const updateQuery = `
+    UPDATE bea_packing
+    SET bea_packing_name = ? WHERE bea_packing_no = ?;
+  `;
+
+  db.query(updateQuery, [bea_packing_name, beaId], (err, result) => {
+    if (err) {
+      console.error("Error updating bea:", err);
+      return res.status(500).json({ message: "Error updating model", error: err.message });
+    }
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "BEA no. not found" });
+    }
+    const fetchQuery = `
+      SELECT * FROM bea_packing WHERE bea_packing_no = ?;
+    `;
+
+    db.query(fetchQuery, [beaId], (fetchErr, fetchResult) => {
+      if (fetchErr) {
+        console.error("Error fetching updated bea:", fetchErr);
+        return res.status(500).json({ message: "Error fetching updated bea", error: fetchErr.message });
+      }
+      const updatedBea = fetchResult[0];
+      res.json({
+        data: {
+          id: updatedBea.bea_packing_no,
+          bea_packing_name: updatedBea.bea_packing_name,
+        }
+      });
+    });
+  });
+});
+
+app.post('/bea', async (req, res) => {
+  try{
+  const { bea_packing_name } = req.body;
+
+  if (!bea_packing_name) {
+    return res.status(400).json({ message: "BEA number is required" });
+  }
+
+  const insertQuery = `INSERT INTO bea_packing (bea_packing_name) VALUES (?)`;
+
+  db.query(insertQuery, [bea_packing_name], (err, result) => {
+    if (err) {
+      console.error("Error inserting bea:", err);
+      return res.status(500).json({ message: "Database error", error: err.message || err.sqlMessage });
+    }
+
+    const newBeaId = result.insertId;
+
+    const selectQuery = "SELECT * FROM bea_packing WHERE bea_packing_no = ?";
+    db.query(selectQuery, [newBeaId], (err, beaResult) => {
+      if (err) {
+        console.error("Error fetching new bea:", err);
+        return res.status(500).json({ message: "Error fetching new bea", error: err.message || err.sqlMessage });
+      }
+
+      if (beaResult.length === 0) {
+        return res.status(404).json({ message: "Bea not found after creation" });
+      }
+
+      const newbea = beaResult[0];
+
+      res.status(201).json({
+        data: {
+          id: newbea.bea_packing_no,
+          bea_packing_name: newbea.bea_packing_name
+        }
+      });
+    });
+  });
+}catch(error){
+  console.error("Unexpected error:", error.message);
+  res.status(500).json({ message: "Internal server error", error: error.message });
+}
+});
+
+app.delete('/bea', async (req, res) => {
+  const { beaId } = req.body; // Expecting an array of model IDs
+
+  if (!Array.isArray(beaId) || beaId.length === 0) {
+    return res.status(400).json({ message: "Invalid request, provide an array of bea IDs" });
+  }
+
+  const deleteQuery = `DELETE FROM bea_packing WHERE bea_packing_no IN (?)`;
+  try {
+    db.query(deleteQuery, [beaId], (err, result) => {
+      if (err) {
+        return res.status(500).json({ message: 'Error deleting bea no.', error: err.sqlMessage });
+      }
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ message: 'BEA not found' });
+      }
+
+      const maxIdQuery = 'SELECT MAX(bea_packing_no) AS maxId FROM bea_packing';
+        db.query(maxIdQuery, (err, maxResult) => {
+          if (err) {
+            return res.status(500).json({ message: 'Error fetching max ID', error: err.sqlMessage });
+          }
+
+          const newAutoIncrement = (maxResult[0].maxId || 0) + 1;
+
+          // Step 3: Reset AUTO_INCREMENT
+          const resetQuery = `ALTER TABLE bea_packing AUTO_INCREMENT = ${newAutoIncrement}`;
+          db.query(resetQuery, (err) => {
+            if (err) {
+              return res.status(500).json({ message: 'Error resetting auto-increment', error: err.sqlMessage });
+            }
+
+            res.json({ message: 'BEA deleted and AUTO_INCREMENT reset successfully' });
+          });
+        });
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Internal server error', error: error.message });
+  }
+});
+
+// Delete a model by ID
+app.delete('/bea_packing/:bea_packing_no', async (req, res) => {
+  const beaId = req.params.bea_packing_no;
+
+  try {
+    // Step 1: Delete the user
+    const deleteQuery = 'DELETE FROM bea_packing WHERE bea_packing_no = ?';
+    db.query(deleteQuery, [beaId], async (err, result) => {
+      if (err) {
+        return res.status(500).json({ message: 'Error deleting bea', error: err.sqlMessage });
+      }
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ message: 'BEA no. not found' });
+      }
+
+      // Step 2: Get the highest existing ID
+      const maxIdQuery = 'SELECT MAX(bea_packing_no) AS maxId FROM bea_packing';
+      db.query(maxIdQuery, (err, maxResult) => {
+        if (err) {
+          return res.status(500).json({ message: 'Error fetching max ID', error: err.sqlMessage });
+        }
+
+        const newAutoIncrement = (maxResult[0].maxId || 0) + 1;
+
+        // Step 3: Reset AUTO_INCREMENT
+        const resetQuery = `ALTER TABLE bea_packing AUTO_INCREMENT = ${newAutoIncrement}`;
+        db.query(resetQuery, (err) => {
+          if (err) {
+            return res.status(500).json({ message: 'Error resetting auto-increment', error: err.sqlMessage });
+          }
+
+          res.json({ message: 'BEA deleted and AUTO_INCREMENT reset successfully' });
         });
       });
     });
