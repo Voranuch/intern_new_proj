@@ -139,96 +139,53 @@ function FormHeader() {
   const handleHeaderSubmit = async (e) => {
     e.preventDefault();
   
-    // Check if model_id is required for formA (typeofcartonpallet_id 1) and formC (typeofcartonpallet_id 4)
-    if ((values.typeofcartonpallet_id === "1" || values.typeofcartonpallet_id === "4") && !values.model_id) {
-      alert("Model number is required for this form!");
+    if (!values.typeofcartonpallet_id) {
+      alert("Please select a Carton / Pallet Label!");
+      return;
+    }
+  
+    if (!values.model_id) {
+      alert("Model number is required!");
       return;
     }
   
     try {
-      let productResponse;
-      
-      // For formB (typeofcartonpallet_id === 2), use autocarton_mit, a_mti_ver, and bea_packing_no to fetch data
-      if (values.typeofcartonpallet_id === "2") {
-        if (!values.autocarton_mit || !values.a_mti_ver || !values.bea_packing_no) {
-          alert("autocarton_mit, a_mti_ver, and bea_packing_no are required for formB!");
-          return;
-        }
-  
-        // Fetch product data using the three fields for formB
-        productResponse = await axios.get("http://localhost:8081/getProductDataByDetails", {
-          params: {
-            autocarton_mit: values.autocarton_mit,
-            a_mti_ver: values.a_mti_ver,
-            bea_packing_no: values.bea_packing_no
-          }
-        });
-      } else {
-        // For other forms (formA, formC), fetch product data using model_id
-        if (!values.model_id) {
-          alert("Model number is required!");
-          return;
-        }
-  
-        productResponse = await axios.get("http://localhost:8081/getProductData", {
-          params: { model_num: values.model_id },
-        });
-      }
-  
-      // If no product found based on the search, alert and stop submission
-      if (!productResponse.data || !productResponse.data.product) {
-        alert("Product not found with the given details! Cannot proceed with form submission.");
-        return;
-      }
-  
-      const formattedDate = values.print_date
-        ? new Date(values.print_date).toISOString().split("T")[0]
-        : "";
-  
-      const updatedValues = {
-        ...values,
-        model_id: values.model_id,
-        print_date: formattedDate,
-        time: currentTime,
-      };
-  
-      // Prepare form data for submission
       const formData = new FormData();
-      formData.append("values", JSON.stringify(updatedValues));
+      formData.append("values", JSON.stringify(values));
       if (selectedImage) {
         formData.append("image", selectedImage);
       }
   
-      // Submit the form data to the backend
+      // ส่งข้อมูลไปยัง backend
       const response = await axios.post("http://localhost:8081/insertFormheader", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
+        headers: { "Content-Type": "multipart/form-data" },
       });
   
+      // ตรวจสอบว่ามี URL ของรูปภาพที่อัปโหลดหรือไม่
+      const imageUrl = response.data.imageUrl || null;
+  
+      // สร้าง object สำหรับการ navigate พร้อมกับข้อมูลที่ต้องการส่งไป
       const navigationData = {
         state: {
-          ...(values.model_id && { model_num: values.model_id }), // Pass model_num only if available
-          ...(response.data.imageUrl && { imageUrl: response.data.imageUrl }),
+          model_num: values.model_id,
+          imageUrl: imageUrl,
         },
       };
   
-      // Navigate based on typeofcartonpallet_id
-      if (values.typeofcartonpallet_id === "1") {
-        navigate('/formA', navigationData);  // Navigate to formA with model_num
-      } else if (values.typeofcartonpallet_id === "2") {
-        navigate('/formB', navigationData);  // Navigate to formB without model_num
-      } else if (values.typeofcartonpallet_id === "3") {
-        navigate('/formC', navigationData);  // Navigate to formC with model_num
-      } else if (values.typeofcartonpallet_id === "4") {
-        navigate('/formD', navigationData);  // Navigate to formD with model_num
+      // เปลี่ยนเส้นทางไปยัง Form ที่ถูกต้อง
+      if (values.typeofcartonpallet_id === 1) {
+        navigate("/formA", navigationData);
+      } else if (values.typeofcartonpallet_id === 2) {
+        navigate("/formB", navigationData);
+      } else if (values.typeofcartonpallet_id === 3) {
+        navigate("/formC", navigationData);
       } else {
-        alert("Invalid selection! Please choose a valid CP option.");
+        alert("Invalid selection! Please choose a valid option.");
       }
   
     } catch (error) {
-      console.error("There was an error:", error);
-      alert(`There was an error: ${error.message}`);
+      console.error("Error submitting the form:", error);
+      alert(`Submission failed: ${error.message}`);
     }
   };
   
