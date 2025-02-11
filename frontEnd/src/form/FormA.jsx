@@ -83,61 +83,54 @@ const FormA = () => {
     }
   }, [model_num]);
 
-  const handleSelectChange = (e) => {
-    const { value } = e.target;
-    setSelectedForm(value);
-
-    // Optionally, update formData based on selected form here
-    // For example, set data specific to that form or fetch new data
-    if (value === "formA") {
-        navigate('/formA', { state: { masterData } });
-    } else if (value === "formB") {
-        navigate('/formB', { state: { masterData } });
-    } else if (value === "formC") {
-        navigate('/formC', { state: { masterData } });
-    } else if (value === "formD") {
-        navigate('/formD', { state: { masterData } });
-    }
-  };
-
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
   };
 
- 
-
   useEffect(() => {
     const results = {};
-  
+
     Object.keys(formData).forEach((key) => {
-      const formValue = formData[key]?.toString().trim().toLowerCase();
-      
-      // เช็คว่า key เป็น model_id หรือไม่
-      const masterValue = key === "model_id"
-        ? masterData.model_num?.toString().trim().toLowerCase()  // ใช้ model_num แทน
-        : masterData[key]?.toString().trim().toLowerCase(); // ใช้ key ตามปกติ
-  
-      console.log(`Comparing: ${key} | Form Value: ${formValue} | Master Value: ${masterValue}`);
-  
-      if (!masterValue) {
-        results[key] = "N/A"; 
-      } else if (!formValue) {
-        results[key] = "N/A";
-      } else if (formValue === masterValue) {
-        results[key] = "Passed";
-      } else {
-        results[key] = "Failed";
-      }
+        let formValue = formData[key];
+        let masterValue = key === "model_id" ? masterData.model_num : masterData[key];
+
+        // Format Date Properly (Fix Time Zone Issues)
+        const formatDate = (dateString) => {
+            if (!dateString) return "N/A";
+            const date = new Date(dateString);
+            if (isNaN(date)) return "N/A"; // Handle invalid dates
+            return date.toISOString().split("T")[0]; // Keep only YYYY-MM-DD
+        };
+
+        if (key === "date_MFG") {
+            formValue = formatDate(formData[key]); 
+            masterValue = formatDate(masterData[key]);
+        } else {
+            formValue = formValue?.toString().trim();
+            masterValue = masterValue?.toString().trim();
+        }
+
+        console.log(`Comparing: ${key} | Form Value: ${formValue} | Master Value: ${masterValue}`);
+
+        if (!masterValue || masterValue === "N/A") {
+            results[key] = "N/A"; 
+        } else if (!formValue || formValue === "N/A") {
+            results[key] = "N/A";
+        } else if (formValue === masterValue) {
+            results[key] = "Passed";
+        } else {
+            results[key] = "Failed";
+        }
     });
-  
+
     console.log("Verification Results:", results);
     setVerifyResults(results);
-  }, [formData, masterData, model_num]);
+}, [formData, masterData, model_num]);
   
 
   const disabledItems = [
-    "model_hgst", "country_code","customer_hpn_id", "date_MFG", "LogoVerification", "customerserial_num_1", "customerserial_num_2", "ds_hkmodel", "mlc", "capacity", "weight",
+    "upc","ccc","workweek","qalot_id","driverserial_num_3","driverserial_num_4","country_code","customer_id","customer_hpn_id", "LogoVerification", "customerserial_num_1", "customerserial_num_2", "ds_hkmodel", "mlc", "capacity", "weight",
   ];
 
   // Mapping of field keys to alternative names
@@ -274,14 +267,6 @@ const FormA = () => {
   return (
     <div className="container mt-5" style={{ fontFamily: 'var(--font-family)', fontWeight:"bold" , marginTop:"50px"}}>
       <h2 className="mb-4" style={{ fontWeight:"bold"}}>Buy-Off Form</h2>
-      
-      <select className="form-select mb-4" value={selectedForm} onChange={handleSelectChange}>
-        <option value="">Select a Form</option>
-        <option value="formA">Form A</option>
-        <option value="formB">Form B</option>
-        <option value="formC">Form C</option>
-        <option value="formD">Form D</option>
-      </select>
   
       {loading ? (
         <div className="text-center">Loading...</div>
@@ -352,17 +337,26 @@ const FormA = () => {
                           {key === "hdd_p" &&
                             hdd_p.map((option, idx) => <option key={idx} value={option}>{option}</option>)}
                         </select>
-                      ) : (
-                        <input
-                          type="text"
-                          className={`form-control ${formSubmitted && isFieldEmpty ? "is-invalid" : ""}`} 
-                          name={key}
-                          value={formData[key] || ""}
-                          onChange={handleChange}
-                          disabled={isDisabled}
-                          style={{ cursor: isDisabled ? "not-allowed" : "text" }}
-                        />
-                      )}
+                      ) : key === "date_MFG" ? (
+                          <input
+                            type="date"
+                            className="form-control"
+                            name={key}
+                            value={formData[key] || ""}
+                            onChange={handleChange}
+                            disabled={isDisabled}
+                          />
+                        ) : (
+                          <input
+                            type="text"
+                            className={`form-control ${formSubmitted && isFieldEmpty ? "is-invalid" : ""}`} 
+                            name={key}
+                            value={formData[key] || ""}
+                            onChange={handleChange}
+                            disabled={isDisabled}
+                            style={{ cursor: isDisabled ? "not-allowed" : "text" }}
+                          />
+                        )}
                     </td>
                     <td className="text-center">
                       {verifyResults[key] ? (
