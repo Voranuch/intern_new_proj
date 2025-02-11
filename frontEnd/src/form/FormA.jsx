@@ -4,6 +4,8 @@ import successGif from "../successGif.gif";
 import { Modal, Button } from "react-bootstrap"; 
 import { useLocation, useNavigate } from "react-router-dom";
 import "bootstrap/dist/css/bootstrap.min.css";
+import Zoom from 'react-medium-image-zoom';
+import 'react-medium-image-zoom/dist/styles.css';
 
 
 const FormA = () => {
@@ -130,7 +132,7 @@ const FormA = () => {
   
 
   const disabledItems = [
-    "upc","ccc","workweek","qalot_id","driverserial_num_3","driverserial_num_4","country_code","customer_id","customer_hpn_id", "LogoVerification", "customerserial_num_1", "customerserial_num_2", "ds_hkmodel", "mlc", "capacity", "weight",
+    "upc","ccc","workweek","qalot_id","driverserial_num_3","driverserial_num_4","country_code","customer_id","customer_hpn_id","customer", "LogoVerification", "customerserial_num_1", "customerserial_num_2", "ds_hkmodel", "mlc", "capacity", "weight",
   ];
 
   // Mapping of field keys to alternative names
@@ -261,18 +263,31 @@ const FormA = () => {
         setAlertMessage("An error occurred while inserting the buyoff item.");
       });
   };
-
-  
-
   return (
+    <>
+    <style>
+      {`
+        .blurred {
+          filter: blur(5px);
+          transition: filter 0.3s ease-in-out;
+          pointer-events: none; /* Prevent clicking or dragging */
+          user-select: none; /* Disable text selection */
+        }
+        .unblurred {
+          filter: none;
+        }
+      `}
+    </style>
+
+
     <div className="container mt-5" style={{ fontFamily: 'var(--font-family)', fontWeight:"bold" , marginTop:"50px"}}>
-      <h2 className="mb-4" style={{ fontWeight:"bold"}}>Buy-Off Form</h2>
+      <h2 className="mb-4" style={{ fontWeight:"bold", marginLeft: "-70px"}}>3.5” Dual brand with PN</h2>
   
       {loading ? (
         <div className="text-center">Loading...</div>
       ) : (
         <div className="row">
-        <div className="col-md-8">
+        <div className="col-md-8" style={{ marginLeft: "-70px" }}>
         <form>
         {alertMessage && (
             <div className="alert alert-danger text-center" role="alert">
@@ -282,102 +297,101 @@ const FormA = () => {
           <table className="table table-bordered table-hover">
             <thead className="table-primary text-center">
               <tr>
-                <th>Buyoff Item</th>
-                <th>Master Info</th>
-                <th>Input</th>
-                <th>Result</th>
+                <th style={{padding: "5px", width: "42%"}}>Buyoff Item</th>
+                <th style={{padding: "5px", width: "30%"}}>Master Info</th>
+                <th style={{padding: "5px", width: "30%"}}>Input</th>
+                <th style={{padding: "5px", width: "25%"}}>Result</th>
               </tr>
             </thead>
             <tbody>
-              {Object.entries(alternativeNames).map(([key, label], index) => {
-                const isDisabled = disabledItems.includes(key);
-                const isFieldEmpty = !formData[key] && !isDisabled;
-                return (
-                  <tr key={index} className={isDisabled ? "table-secondary" : ""}>
-                    <td>{label}</td>
-                    <td>
-                      {key === "model_id" ? (
-                        masterData.model_num || "N/A"
-                      ) : key === "customer_id" ? (
-                        customerid.find((c) => c.customer_id === masterData[key])?.customer_name || "N/A"
-                      ) : key === "customer_hpn_id" ? (
-                        customerhpnid.find((c) => c.customer_hpn_id === masterData[key])?.customer_hpn_list || "N/A"
-                      ) : (
-                        masterData[key] || "N/A"
-                      )}
-                    </td>
+              {Object.entries(alternativeNames)
+                .filter(([key]) => !disabledItems.includes(key)) // Remove disabled items
+                .map(([key, label], index) => {
+                  return (
+                    <tr key={index} style={{ height: "30px" }}>
+                      <td style={{ padding: "5px" }}>{label}</td>
+                      <td 
+                        style={{ padding: "5px" }}
+                        className={verifyResults[key] === "Passed" ? "unblurred" : "blurred"}
+                      >
 
-                    <td>
-                      {["rohs", "madeinthai", "c_madeinthai", "manufac_wd", "hdd_p", "customer_id", "customer_hpn_id"].includes(key) ? (
-                        <select
-                          className="form-select"
-                          name={key}
-                          value={formData[key] || ""}
-                          onChange={handleChange}
-                          disabled={isDisabled}
-                          style={{ cursor: isDisabled ? "not-allowed" : "pointer" }}
-                        >
-                          <option value="">Select Option</option>
-                          {key === "rohs" &&
-                            rohsOptions.map((option, idx) => <option key={idx} value={option}>{option}</option>)}
-                          {key === "customer_id" &&
-                            customerid.map((cus) => (
-                              <option key={cus.customer_id} value={cus.customer_id}>{cus.customer_name}</option>
-                            ))}
+                          {key === "model_id" ? (
+                            masterData.model_num || "N/A"
+                          ) : key === "customer_id" ? (
+                            customerid.find((c) => c.customer_id === masterData[key])?.customer_name || "N/A"
+                          ) : key === "customer_hpn_id" ? (
+                            customerhpnid.find((c) => c.customer_hpn_id === masterData[key])?.customer_hpn_list || "N/A"
+                          ) : (
+                            masterData[key] || "N/A"
+                          )}
+                        </td>
+
+                      <td style={{ padding: "5px" }}>
+                        {["rohs", "madeinthai", "c_madeinthai", "manufac_wd", "hdd_p", "customer_id", "customer_hpn_id"].includes(key) ? (
+                          <select
+                            className="form-select"
+                            name={key}
+                            value={formData[key] || ""}
+                            onChange={handleChange}
+                          >
+                            <option value="">Select Option</option>
+                            {key === "rohs" &&
+                              rohsOptions.map((option, idx) => <option key={idx} value={option}>{option}</option>)}
+                            {key === "customer_id" &&
+                              customerid.map((cus) => (
+                                <option key={cus.customer_id} value={cus.customer_id}>{cus.customer_name}</option>
+                              ))}
                             {key === "customer_hpn_id" &&
-                            customerhpnid.map((cus) => (
-                              <option key={cus.customer_hpn_id} value={cus.customer_hpn_id}>{cus.customer_hpn_list}</option>
-                            ))}
-                          {key === "madeinthai" &&
-                            madeinthai.map((option, idx) => <option key={idx} value={option}>{option}</option>)}
-                          {key === "c_madeinthai" &&
-                            c_madeinthai.map((option, idx) => <option key={idx} value={option}>{option}</option>)}
-                          {key === "manufac_wd" &&
-                            manufac_wd.map((option, idx) => <option key={idx} value={option}>{option}</option>)}
-                          {key === "hdd_p" &&
-                            hdd_p.map((option, idx) => <option key={idx} value={option}>{option}</option>)}
-                        </select>
-                      ) : key === "date_MFG" ? (
+                              customerhpnid.map((cus) => (
+                                <option key={cus.customer_hpn_id} value={cus.customer_hpn_id}>{cus.customer_hpn_list}</option>
+                              ))}
+                            {key === "madeinthai" &&
+                              madeinthai.map((option, idx) => <option key={idx} value={option}>{option}</option>)}
+                            {key === "c_madeinthai" &&
+                              c_madeinthai.map((option, idx) => <option key={idx} value={option}>{option}</option>)}
+                            {key === "manufac_wd" &&
+                              manufac_wd.map((option, idx) => <option key={idx} value={option}>{option}</option>)}
+                            {key === "hdd_p" &&
+                              hdd_p.map((option, idx) => <option key={idx} value={option}>{option}</option>)}
+                          </select>
+                        ) : key === "date_MFG" ? (
                           <input
                             type="date"
                             className="form-control"
                             name={key}
                             value={formData[key] || ""}
                             onChange={handleChange}
-                            disabled={isDisabled}
                           />
                         ) : (
                           <input
                             type="text"
-                            className={`form-control ${formSubmitted && isFieldEmpty ? "is-invalid" : ""}`} 
+                            className="form-control"
                             name={key}
                             value={formData[key] || ""}
                             onChange={handleChange}
-                            disabled={isDisabled}
-                            style={{ cursor: isDisabled ? "not-allowed" : "text" }}
                           />
                         )}
-                    </td>
-                    <td className="text-center">
-                      {verifyResults[key] ? (
-                        <span
-                          className={`badge ${
-                            verifyResults[key] === "Passed" ? "bg-success" : verifyResults[key] === "Failed" ? "bg-danger" : "bg-secondary"
-                          }`}
-                        >
-                          {verifyResults[key]}
-                        </span>
-                      ) : (
-                        <span className="text-muted">N/A</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
+                      </td>
+                      <td className="text-center">
+                        {verifyResults[key] ? (
+                          <span
+                            className={`badge ${
+                              verifyResults[key] === "Passed" ? "bg-success" : verifyResults[key] === "Failed" ? "bg-danger" : "bg-secondary"
+                            }`}
+                          >
+                            {verifyResults[key]}
+                          </span>
+                        ) : (
+                          <span className="text-muted">N/A</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
             </tbody>
           </table>
   
-          <div className="text-end mt-4">
+          <div className="text-end mt-4" style={{marginBottom:"30px"}}>
             <button type="submit" className="btn btn-success btn-lg ms-3" onClick={handleSubmit}>
               Submit
             </button>
@@ -400,19 +414,26 @@ const FormA = () => {
         </div>
 
         <div className="col-md-4">
-            {imageUrl ? (
-            <div>
-              <h3>Uploaded Image:</h3>
-              <img src={`http://localhost:8081${imageUrl}`} alt="Uploaded Image" style={{ width: "100%", height: "auto" }} />
-            </div>
-          ) : (
-            <p>No image uploaded.</p>
-          )}
-        </div>
+        {imageUrl ? (
+          <div>
+            <h3>Uploaded Image:</h3>
+            <Zoom>
+              <img 
+                src={`http://localhost:8081${imageUrl}`} 
+                alt="Uploaded Image" 
+                style={{ width: "145%", height: "auto", cursor: "pointer" }} 
+              />
+            </Zoom>
+          </div>
+        ) : (
+          <p>No image uploaded.</p>
+        )}
+      </div>
       </div>
     
   )}
   </div>
+  </>
 );
 };
 
