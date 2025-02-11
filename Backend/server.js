@@ -924,6 +924,7 @@ app.get('/getData', (req,res)=>{
     })
 })
 
+
 app.get('/', (req, res) => {
   res.json({ success: true, message: "Data fetched successfully!" });
 });
@@ -1200,7 +1201,6 @@ app.get('/getRohsOptions', (req, res) => {
     });
   });
   
-  
   app.listen(5000, () => console.log("Server running on port 5000"));
 
 
@@ -1236,31 +1236,58 @@ app.post('/insertBuyoffItem', (req, res) => {
     weight,
   } = req.body;
 
-  const query = `INSERT INTO buyoff_item (
-    model_id, model_hgst, upc, ccc, workweek, qalot_id, qty, package_id,
-    driverserial_num_1, driverserial_num_2, driverserial_num_3, driverserial_num_4,
-    customer_id, customer, rohs, country_code, date_MFG, madeinthai, c_madeinthai,
-    manufac_wd, hdd_p, LogoVerification, customerserial_num_1, customerserial_num_2,
-    ds_hkmodel, mlc, capacity, weight
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  function cleanValue(value) {
+    return value === "" ? null : value;
+  }
 
-  db.query(
-    query,
-    [
+  const values = [
+    cleanValue(model_id),
+    cleanValue(model_hgst),
+    cleanValue(upc),
+    cleanValue(ccc),
+    cleanValue(workweek),
+    cleanValue(qalot_id),
+    cleanValue(qty ? parseInt(qty) : null), // Convert qty to integer
+    cleanValue(package_id),
+    cleanValue(driverserial_num_1),
+    cleanValue(driverserial_num_2),
+    cleanValue(driverserial_num_3),
+    cleanValue(driverserial_num_4),
+    cleanValue(customer_id ? parseInt(customer_id) : null), // Convert to integer
+    cleanValue(customer),
+    cleanValue(rohs),
+    cleanValue(country_code),
+    cleanValue(date_MFG), // Ensure correct date format
+    cleanValue(madeinthai),
+    cleanValue(c_madeinthai),
+    cleanValue(manufac_wd),
+    cleanValue(hdd_p),
+    cleanValue(LogoVerification),
+    cleanValue(customerserial_num_1),
+    cleanValue(customerserial_num_2),
+    cleanValue(ds_hkmodel),
+    cleanValue(mlc),
+    cleanValue(capacity),
+    cleanValue(weight)
+  ];
+
+  const query = `
+    INSERT INTO buyoff_item (
       model_id, model_hgst, upc, ccc, workweek, qalot_id, qty, package_id,
       driverserial_num_1, driverserial_num_2, driverserial_num_3, driverserial_num_4,
       customer_id, customer, rohs, country_code, date_MFG, madeinthai, c_madeinthai,
       manufac_wd, hdd_p, LogoVerification, customerserial_num_1, customerserial_num_2,
-      ds_hkmodel, mlc, capacity, weight,
-    ],
-    (err, result) => {
-      if (err) {
-        console.error('Error inserting buyoff item:', err);
-        return res.status(500).json({ success: false, message: 'Error inserting buyoff item' });
-      }
-      return res.status(200).json({ success: true, message: 'Buyoff item inserted successfully', result });
+      ds_hkmodel, mlc, capacity, weight
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+
+  // ✅ Execute Query
+  db.query(query, values, (err, result) => {
+    if (err) {
+      console.error('🔥 Error inserting buyoff item:', err);
+      return res.status(500).json({ success: false, message: 'Error inserting buyoff item', error: err.message });
     }
-  );
+    return res.status(200).json({ success: true, message: 'Buyoff item inserted successfully', result });
+  });
 });
 
 app.use('/images', express.static(path.join(__dirname, 'public', 'images')));
