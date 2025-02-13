@@ -850,44 +850,90 @@ app.post("/api/register", async (req, res) => {
 });
 
 // API สำหรับ Login
-app.post("/api/login", (req, res) => {
-  const { email, password } = req.body;
-
+const login = (email, password, res) => {
   if (!email || !password) {
-    return res.status(400).json({ message: "กรุณากรอกอีเมลและรหัสผ่าน" });
+    return res.status(400).json({ message: "กรุณากรอกอีเมลและรหัสผ่าน", error: err.message  });
   }
 
   const sql = "SELECT * FROM users WHERE email = ?";
   db.query(sql, [email], async (err, result) => {
-    if (err) return res.status(500).json({ message: "เกิดข้อผิดพลาด" });
+    if (err) return res.status(500).json({ message: "เกิดข้อผิดพลาด", error: err.message  });
 
     if (result.length === 0) {
-      return res.status(401).json({ message: "Invaild email or password" });
+      return res.status(401).json({ message: "Invalid email or password" });
     }
 
     const user = result[0];
     const passwordMatch = await bcrypt.compare(password, user.password);
 
     if (!passwordMatch) {
-      return res.status(401).json({ message: "Invaild email or password" });
+      return res.status(401).json({ message: "Invalid email or password" });
     }
-    // ดึง role จากฐานข้อมูล
+
+    // Fetch user role
     const roleSql = "SELECT role_name FROM roles WHERE id = ?";
     db.query(roleSql, [user.role_id], (err, roleResult) => {
-      if (err) return res.status(500).json({ message: "เกิดข้อผิดพลาด" });
+      if (err) return res.status(500).json({ message: "เกิดข้อผิดพลาด", error: err.message  });
 
-      const userRole = roleResult[0]?.role_name || "user"; 
+      const userRole = roleResult[0]?.role_name || "user";
 
-      // ✅ ส่ง username ไปด้วย
+      // ✅ Generate JWT Token
       const token = jwt.sign({ id: user.id, role: userRole }, SECRET_KEY, { expiresIn: "1h" });
 
-      res.json({ 
-        token, 
-        role: userRole, 
+      // ✅ Send response with token
+      res.json({
+        token,
+        role: userRole,
         username: user.username,
-        firstname: user.firstname,  
-        lastname: user.lastname   
+        firstname: user.firstname,
+        lastname: user.lastname,
       });
+    });
+  });
+};
+
+// ✅ Correct usage in Express route
+app.post("/api/login", (req, res) => {
+  const { email, password } = req.body;
+  login(email, password, res);
+});
+
+// Middleware to verify token
+const authenticate = (req, res, next) => {
+  const token = req.headers.authorization?.split(" ")[1]; // Get token from headers
+
+  if (!token) {
+    return res.status(401).json({ message: "Unauthorized: No token provided" });
+  }
+
+  jwt.verify(token, SECRET_KEY, (err, decoded) => {
+    if (err) {
+      return res.status(403).json({ message: "Forbidden: Invalid token" });
+    }
+    req.user = decoded; // Attach user data to request
+    next();
+  });
+};
+
+// API to get logged-in user details
+app.get("/api/user", authenticate, (req, res) => {
+  const sql = "SELECT id, username, firstname, lastname, role_id FROM users WHERE id = ?";
+  
+  db.query(sql, [req.user.id], (err, result) => {
+    if (err) return res.status(500).json({ message: "Database error" , error: err.message });
+
+    if (result.length === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const user = result[0];
+
+    res.json({
+      id: user.id,
+      username: user.username,
+      firstname: user.firstname,
+      lastname: user.lastname,
+      role: req.user.role, // Role from token
     });
   });
 });
