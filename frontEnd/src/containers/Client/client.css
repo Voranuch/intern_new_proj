@@ -1,0 +1,142 @@
+.client-container {
+    min-height: 100vh; /* Ensure the container covers at least the full height of the viewport */
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    text-align: center;
+    padding: 10px;
+    font-family: var(--font-family);
+}
+
+.navbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    padding: 2rem 6rem;
+}
+
+.gpt3__navbar-user {
+    display: flex;
+    align-items: center; /* Align text and button */
+    gap: 50px; /* Space between text and button */
+    font-size: 18px; /* Adjust font size */
+    font-weight: 500;
+    color: #333;
+    margin-left: auto; /* Pushes the username to the right */
+    padding-right: 20px; /* Adds some spacing from the right edge */
+}
+  
+.gpt3__navbar-user strong {
+    color: #000; /* Make username stand out */
+}
+
+.hero-sectionm h1 {
+    font-family: var(--font-family);
+    font-weight: 600;
+    font-size: 4rem;
+    margin-top: 50px;
+    margin-bottom: 10px;
+}
+
+.hero-sectionm p {
+    font-family: var(--font-family);
+    font-size: 1.2rem;
+    margin-bottom: 100px;
+}
+
+@media screen and (max-width: 1050px) {
+    .navbar-list {
+        flex-direction: column;
+        align-items: center;
+    }
+}
+
+/* Navbar list */
+
+
+.gpt3__navbar-links {
+    flex: 1;
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+}
+
+.gpt3__navbar-links_logo {
+    margin-right: 1rem;
+}
+
+.gpt3__navbar-links_logo img {
+    width: 140px;
+    height: 50px;
+}
+
+.gpt3__navbar-links_container {
+    display: flex;
+    flex-direction: row;
+}
+.gradient__bg {
+    background: -moz-radial-gradient(circle at 3% 25%, rgba(246, 79, 146, 1) 2%, rgba(203, 98, 222, 1) 39%, rgba(96, 226, 255, 1) 100%);
+    background: -webkit-radial-gradient(circle at 3% 25%, rgba(246, 79, 146, 1) 2%, rgba(203, 98, 222, 1) 39%, rgba(96, 226, 255, 1) 100%);
+    background: -o-radial-gradient(circle at 3% 25%, rgba(246, 79, 146, 1) 2%, rgba(203, 98, 222, 1) 39%, rgba(96, 226, 255, 1) 100%);
+    background: -ms-radial-gradient(circle at 3% 25%, rgba(246, 79, 146, 1) 2%, rgba(203, 98, 222, 1) 39%, rgba(96, 226, 255, 1) 100%);
+    background: radial-gradient(circle at 3% 25%, rgba(246, 79, 146, 1) 2%, rgba(203, 98, 222, 1) 39%, rgba(96, 226, 255, 1) 100%);
+    background-size: cover; /* Make sure the background covers the full area */
+    background-attachment: fixed; /* Optional: for a fixed background effect */
+}
+.content {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 250px;
+}
+
+.card-container {
+    display: flex;
+    gap: 20px;
+}
+
+.card {
+    background: #20232a;
+    color: white;
+    padding: 20px;
+    border-radius: 10px;
+    text-align: center;
+    width: 250px;
+    height: 150px;
+    cursor: pointer;
+    transition: 0.3s;
+    font-family: var(--font-family);
+    font-weight: 500;
+    font-size: 18px;
+    line-height: 25px;
+}
+
+.card:hover {
+    background: #282c34;
+}
+
+.card img {
+    width: 100%;
+    border-radius: 8px;
+}
+
+.btn {
+    background: #61dafb;
+    color: #20232a;
+    padding: 8px 16px;
+    border: none;
+    cursor: pointer;
+    border-radius: 5px;
+    margin-top: 10px;
+    transition: 0.3s;
+}
+
+.btn:hover {
+    background: #21a1f1;
+}
+
+.selection {
+    margin-top: 20px;
+    font-size: 18px;
+    font-weight: bold;
+}
