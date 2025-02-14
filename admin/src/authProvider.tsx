@@ -49,8 +49,14 @@ export const authProvider: AuthProvider = {
     },
 
     checkAuth: () => {
-        return localStorage.getItem('token') ? Promise.resolve() : Promise.reject();
-    },
+        const token = localStorage.getItem('token');
+        if (token) {
+            return Promise.resolve();
+        } else {
+            console.warn('No token found, redirecting to login...');
+            return Promise.reject();
+        }
+    },    
 
     getPermissions: () => {
         const role = localStorage.getItem('role');
