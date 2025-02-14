@@ -4,6 +4,7 @@ const cors = require('cors')
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const bodyParser = require('body-parser');
+const cookieParser = require("cookie-parser");
 const path = require("path");
 const multer = require("multer");
 const fs = require('fs');
@@ -16,9 +17,17 @@ const SECRET_KEY = process.env.SECRET_KEY;
 console.log("Your secret key is:", SECRET_KEY);
 
 const app = express()
-app.use(cors())
+
+app.use(cors({
+  origin: ['http://localhost:3000', 'http://localhost:5173'], // ✅ Allow both origins
+  credentials: true,  
+  methods: ['GET', 'POST', 'PUT', 'DELETE'], 
+  allowedHeaders: ['Content-Type', 'Authorization'], 
+}));
+
 app.use(express.json());
 app.use(bodyParser.json());
+app.use(cookieParser());
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -852,14 +861,19 @@ app.post("/api/register", async (req, res) => {
 // API สำหรับ Login
 const login = (email, password, res) => {
   if (!email || !password) {
-    return res.status(400).json({ message: "กรุณากรอกอีเมลและรหัสผ่าน", error: err.message  });
+    console.error("❌ Missing email or password");
+    return res.status(400).json({ message: "กรุณากรอกอีเมลและรหัสผ่าน" });
   }
 
   const sql = "SELECT * FROM users WHERE email = ?";
   db.query(sql, [email], async (err, result) => {
-    if (err) return res.status(500).json({ message: "เกิดข้อผิดพลาด", error: err.message  });
+    if (err) {
+      console.error("❌ Database error:", err);  // ✅ Log Database Error
+      return res.status(500).json({ message: "เกิดข้อผิดพลาด", error: err.message });
+    }
 
     if (result.length === 0) {
+      console.warn("⚠️ Invalid email or password");  // ✅ Log ถ้า Login ไม่ผ่าน
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
@@ -867,20 +881,26 @@ const login = (email, password, res) => {
     const passwordMatch = await bcrypt.compare(password, user.password);
 
     if (!passwordMatch) {
+      console.warn("⚠️ Password incorrect");
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
     // Fetch user role
     const roleSql = "SELECT role_name FROM roles WHERE id = ?";
     db.query(roleSql, [user.role_id], (err, roleResult) => {
-      if (err) return res.status(500).json({ message: "เกิดข้อผิดพลาด", error: err.message  });
+      if (err) {
+        console.error("❌ Role query error:", err);
+        return res.status(500).json({ message: "เกิดข้อผิดพลาด", error: err.message });
+      }
 
       const userRole = roleResult[0]?.role_name || "user";
 
       // ✅ Generate JWT Token
       const token = jwt.sign({ id: user.id, role: userRole }, SECRET_KEY, { expiresIn: "1h" });
 
-      // ✅ Send response with token
+      // ✅ Log Success
+      console.log("✅ Login Success:", { id: user.id, username: user.username, role: userRole });
+
       res.json({
         token,
         role: userRole,
@@ -898,44 +918,92 @@ app.post("/api/login", (req, res) => {
   login(email, password, res);
 });
 
+const handleLogout = async () => {
+  try {
+    await axios.post("http://localhost:8081/api/logout", {}, { withCredentials: true });
+
+    localStorage.clear(); // เคลียร์ localStorage เผื่อไว้
+    alert("Logged out successfully!");
+    navigate("/login");
+  } catch (error) {
+    console.error("Logout error:", error);
+  }
+};
+
+app.post("/api/logout", (req, res) => {
+  res.clearCookie("token", { httpOnly: true, secure: true, sameSite: "None" });
+  res.json({ message: "Logged out successfully" });
+});
+
 // Middleware to verify token
 const authenticate = (req, res, next) => {
-  const token = req.headers.authorization?.split(" ")[1]; // Get token from headers
+  const authHeader = req.headers.authorization;
 
-  if (!token) {
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    console.error("❌ No token provided in request headers");
     return res.status(401).json({ message: "Unauthorized: No token provided" });
   }
 
+  const token = authHeader.split(" ")[1]; // Extract token
+
   jwt.verify(token, SECRET_KEY, (err, decoded) => {
     if (err) {
+      console.error("❌ Invalid token:", err.message);
       return res.status(403).json({ message: "Forbidden: Invalid token" });
     }
-    req.user = decoded; // Attach user data to request
+    req.user = decoded; // ✅ Save decoded user data
+    console.log("✅ Token verified. User:", decoded);
     next();
   });
 };
 
+
 // API to get logged-in user details
-app.get("/api/user", authenticate, (req, res) => {
-  const sql = "SELECT id, username, firstname, lastname, role_id FROM users WHERE id = ?";
+app.get("/api/user", authenticate, async (req, res) => {
+  console.log("🟢 Received request to /api/user");
   
-  db.query(sql, [req.user.id], (err, result) => {
-    if (err) return res.status(500).json({ message: "Database error" , error: err.message });
+  if (!req.user) {
+    console.error("❌ User not found in request");
+    return res.status(401).json({ message: "Unauthorized: No user found" });
+  }
 
-    if (result.length === 0) {
-      return res.status(404).json({ message: "User not found" });
-    }
+  try {
+    console.log("🔹 Fetching user details for ID:", req.user.id);
 
-    const user = result[0];
+    const sql = `
+      SELECT users.id, users.username, users.firstname, users.lastname, roles.role_name 
+      FROM users 
+      JOIN roles ON users.role_id = roles.id 
+      WHERE users.id = ?`;
 
-    res.json({
-      id: user.id,
-      username: user.username,
-      firstname: user.firstname,
-      lastname: user.lastname,
-      role: req.user.role, // Role from token
+    db.query(sql, [req.user.id], (err, result) => {
+      if (err) {
+        console.error("❌ Database query error:", err);
+        return res.status(500).json({ message: "Database error", error: err.message });
+      }
+
+      if (result.length === 0) {
+        console.warn("⚠️ No user found for ID:", req.user.id);
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const user = result[0];
+
+      console.log("✅ User details fetched successfully:", user);
+
+      res.json({
+        id: user.id,
+        username: user.username,
+        firstname: user.firstname,
+        lastname: user.lastname,
+        role: user.role_name,
+      });
     });
-  });
+
+  } catch (error) {
+    console.error("❌ Unexpected error in /api/user:", error);
+    return res.status(500).json({ message: "เกิดข้อผิดพลาด", error: error.message });
+  }
 });
 
 
