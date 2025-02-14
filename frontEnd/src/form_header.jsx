@@ -34,8 +34,9 @@ function FormHeader() {
 
   const [productData, setProductData] = useState(null); // Define state to store product data
   const [selectedImage, setSelectedImage] = useState(null);
+  const [firstname, setFirstname] = useState("");
+  const [lastname, setLastname] = useState("");
   const navigate = useNavigate();
-
   // Fetching required data on component mount
   useEffect(() => {
     axios
@@ -116,6 +117,30 @@ function FormHeader() {
       fetchData(values.model_id);
     }
   }, [values.model_id]);
+
+  const [user, setUser] = useState(null);
+  const token = localStorage.getItem("token");
+
+  useEffect(() => {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        navigate("/login");
+        return;
+      }
+    
+      axios.get("http://localhost:5000/api/user", {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      .then(response => {
+        setFirstname(response.data.firstname);
+        setLastname(response.data.lastname);
+      })
+      .catch(error => {
+        console.error("Error fetching user data:", error);
+      });
+    
+    }, [navigate]);
+  
 
   const fetchData = async (model_num) => {
     try {
@@ -237,6 +262,9 @@ function FormHeader() {
   return (
     <Container  style={{ fontFamily: 'var(--font-family)', fontWeight:"bold" , marginTop:"50px"}}>
       <h1 className="text-center my-4" style={{ fontWeight:"bold", marginTop:"20px" }}>Form Submission</h1>
+      <div className="mb-3 text-end">
+        <h4>Logged in as: {firstname} {lastname}</h4>
+      </div>
       <div className="mb-4">
         <h2 className="mb-3">General Information</h2>
         <Form onSubmit={handleHeaderSubmit}>
