@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { Worker, Viewer } from '@react-pdf-viewer/core';
+import { useNavigate } from "react-router-dom";
+import '@react-pdf-viewer/core/lib/styles/index.css';
 import { Container, Form, Table, Row, Col, Button,Modal } from "react-bootstrap";
 
 const FavForm = () => {
@@ -18,6 +21,9 @@ const FavForm = () => {
     const [uploadedFiles, setUploadedFiles] = useState([]);
     const [viewFile, setViewFile] = useState(null);
     const [isFormSubmitted, setIsFormSubmitted] = useState(false);
+    const [selectedImage, setSelectedImage] = useState(null);
+    const [showModal, setShowModal] = useState(false);
+    const navigate = useNavigate();
 
   const categories = [
     { title: "Featuring", key: "featuring", fields: [
@@ -109,18 +115,32 @@ const FavForm = () => {
     });
   };
 
-  const handleRemoveFile = (fileName) => {
-    setUploadedFiles((prevFiles) => prevFiles.filter((file) => file.file.name !== fileName));
+  const handleRemoveFile = (index) => {
+    setUploadedFiles((prevFiles) => prevFiles.filter((_, i) => i !== index));
   };
 
   const handleViewFile = (file) => {
-    if (file.file.type.startsWith('image')) {
-      setViewFile(URL.createObjectURL(file.file)); 
-    } else if (file.file.type === 'application/pdf') {
-      setViewFile(URL.createObjectURL(file.file)); 
-    }
-  };
+    if (!file) return;
   
+    const fileURL = URL.createObjectURL(file);
+    window.open(`/view-file?file=${encodeURIComponent(fileURL)}`, "_blank", "noopener,noreferrer");
+  };  
+  
+  const handleFileClick = (file) => {
+    const fileURL = URL.createObjectURL(file);
+    const fileName = file.name.toLowerCase();
+    
+    if (fileName.endsWith(".jpg") || fileName.endsWith(".jpeg") || fileName.endsWith(".png")) {
+        setSelectedImage(fileURL);
+        setShowModal(true);
+    } else if (fileName.endsWith(".pdf")) {
+        window.open(fileURL, "_blank");
+    } else {
+        alert("Unsupported file format.");
+    }
+};
+
+
   const handleCloseModal = () => {
     setViewFile(null); 
   };
@@ -139,9 +159,81 @@ const FavForm = () => {
     }));
   };
 
+  const [items, setItems] = useState([
+    { manual_key: '', scanned_psid: '', judge_result: '' }
+  ]);
+  
+  const handleManualInputChange = (e, index) => {
+    const updatedItems = [...items];
+    updatedItems[index].manualInput = e.target.value;
+    setItems(updatedItems);
+  };
+  
+  const handleScanInputChange = (e, index) => {
+    const updatedItems = [...items];
+    updatedItems[index].scannedBarcode = e.target.value;
+    setItems(updatedItems);
+  };
+  
+  const handleJudgeChange = (e, index) => {
+    const updatedItems = [...items];
+    updatedItems[index].judge = e.target.value;
+    setItems(updatedItems);
+  };
+  
+  const getResult = (item) => {
+    // Example logic for OK/NG based on manual input and scanned barcode
+    if (item.manualInput && item.scannedBarcode) {
+      return item.manualInput === item.scannedBarcode ? 'OK' : 'NG';
+    }else if (!item.manualInput === "N/A"){
+
+    }
+    return 'Pending';
+  };
+
   return (
     <Container style={{ fontFamily: 'var(--font-family)', fontWeight:"bold" , marginTop:"50px"}}>
       <h2 className="text-center my-4">Form Submission</h2>
+      <Table bordered className="mt-3">
+        <thead>
+            <tr>
+            <th>BCD</th>
+            <th>Manual key from actual print</th>
+            <th>Scanned from PSID barcode</th>
+            <th>Judge (ME/QC/MFG)</th>
+            </tr>
+        </thead>
+        <tbody>
+    {items.map((item, index) => (
+      <tr key={index}>
+        <td>
+          PSID
+        </td>
+        <td>
+          <input 
+            type="text" 
+            value={item.manualInput || ''} 
+            onChange={(e) => handleManualInputChange(e, index)} 
+            placeholder="Enter Manual Key"
+          />
+        </td>
+        <td>
+          <input 
+            type="text" 
+            value={item.scannedBarcode || ''} 
+            onChange={(e) => handleScanInputChange(e, index)} 
+            placeholder="Scan PSID Barcode"
+          />
+        </td>
+
+        <td>
+          <span>{getResult(item)}</span> {/* Function to determine OK/NG */}
+        </td>
+      </tr>
+    ))}
+  </tbody>
+
+        </Table>
       <Table bordered>
         <thead>
           <tr>
@@ -285,54 +377,46 @@ const FavForm = () => {
           </div>
         ))}
         </Form.Group> 
-    <Table bordered className="mt-3">
-    <thead>
-        <tr>
-        <th>File Name</th>
-        <th>Category</th>
-        <th>Action</th>
-        </tr>
-    </thead>
-    <tbody>
-        {uploadedFiles.map((file, index) => (
-        <tr key={index}>
-            <td>
-            <Button variant="link" onClick={() => handleViewFile(file)}>
-                {file.file.name}
-            </Button>
-            </td>
-            <td>{file.category}</td>
-            <td>
-            <Button
-                variant="danger"
-                size="sm"
-                onClick={() => handleRemoveFile(file.file.name)}
-            >
-                Remove
-            </Button>
-            </td>
-        </tr>
-        ))}
-    </tbody>
-    </Table>
+<Table bordered className="mt-3">
+  <thead>
+    <tr>
+      <th>File Name</th>
+      <th>File </th>
+      <th>Open</th>
+      <th>Remove</th>
+    </tr>
+  </thead>
+  <tbody>
+  {uploadedFiles.map((fileObj, index) => (
+    <tr key={index}>
+      <td>{fileObj.file.name}</td>
+      <td>{fileObj.category}</td>
+      <td>
+        <Button variant="link" onClick={() => handleFileClick(fileObj.file)}>
+          Open
+        </Button>
+      </td>
+      <td>
+        <Button variant="danger" size="sm" onClick={() => handleRemoveFile(index)}>
+          Remove
+        </Button>
+      </td>
+    </tr>
+  ))}
+</tbody>
 
-    {viewFile && (
-    <Modal show={true} onHide={handleCloseModal}>
-        <Modal.Header closeButton>
-        <Modal.Title>View File</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-        {/* Check if the file is a PDF or image */}
-        {viewFile.endsWith('.pdf') ? (
-            <a href={viewFile} target="_blank" rel="noopener noreferrer">
-            Open PDF in new tab
-            </a>
-        ) : (
-            <img src={viewFile} alt="Uploaded content" style={{ width: '100%' }} />
-        )}
-        </Modal.Body>
-    </Modal>
-    )}
+</Table>
+
+{/* File Viewer Modal */}
+<Modal show={showModal} onHide={() => setShowModal(false)} centered>
+    <Modal.Header closeButton>
+        <Modal.Title>Image Preview</Modal.Title>
+    </Modal.Header>
+    <Modal.Body className="text-center">
+        {selectedImage && <img src={selectedImage} alt="Preview" style={{ maxWidth: "100%" }} />}
+    </Modal.Body>
+</Modal>
+
       <h4>Team Signatures</h4>
       <Table bordered>
         <thead>
