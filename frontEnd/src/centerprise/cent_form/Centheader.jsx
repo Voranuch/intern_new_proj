@@ -78,40 +78,54 @@ function Centheader() {
 
   }, []);
   
-  // Handle form submit
-  const handleHeaderSubmit = async (e) => {
-    e.preventDefault();
-  
-    const updatedValues = {
-      date: values.date,
-      case_no: values.case_no,
-      product_cent_id: values.product_cent_id,
-      model_std_id: values.model_std_id,
-      pn: values.pn,
-      pkg_id: values.pkg_id,
-      customer_cent: values.customer_cent,
-      ref_doc_no: values.ref_doc_no,
-      ref_draw_id: values.ref_draw_id,
-      change_item_id: values.change_item_id,
-      newpn_id: values.newpn_id,
-      fav_level_id: values.fav_level_id || 1,
-      time: currentTime,
-    };
-  
-    console.log("Form data being sent:", updatedValues); // Log the data being sent
-  
-    try {
-      const response = await axios.post("http://localhost:8081/insertCentFormheader", updatedValues);
-      if (response.data) {
-        navigate('/FavForm', { 
-          state: { formData: updatedValues }
-        });
-      }
-    } catch (error) {
-      console.error("Error during form submission:", error.response?.data || error.message);
-      alert(`Error: ${error.response?.data?.message || error.message}`);
-    }
+
+
+const handleHeaderSubmit = async (e) => {
+  e.preventDefault();
+
+  const updatedValues = {
+    date: values.date,
+    case_no: values.case_no,
+    product_cent_id: values.product_cent_id,
+    model_std_id: values.model_std_id,
+    pn: values.pn,
+    pkg_id: values.pkg_id,
+    customer_cent: values.customer_cent,
+    ref_doc_no: values.ref_doc_no,
+    ref_draw_id: values.ref_draw_id,
+    change_item_id: values.change_item_id,
+    newpn_id: values.newpn_id,
+    fav_level_id: values.fav_level_id || 1, // Default to 1 if not provided
+    time: currentTime,
   };
+
+  console.log("Form data being sent:", updatedValues); // Log the data being sent
+
+  try {
+    // Send data to backend to insert into the database
+    const response = await axios.post("http://localhost:8081/insertCentFormheader", updatedValues);
+
+    if (response.data && response.data.form_header_cent_id) {
+      const form_header_cent_id = response.data.form_header_cent_id;
+      console.log("Form header ID from response:", form_header_cent_id);
+
+      // Navigate to the next page with the form_header_cent_id in state
+      navigate('/FavForm', { 
+        state: { form_header_cent_id: form_header_cent_id }
+      });
+
+      // Optionally reset form here (if you want to clear the form after submission)
+      // resetForm(); 
+    } else {
+      console.error("Form header ID not found in response.");
+      alert("Error: Could not retrieve the form_header_cent_id.");
+    }
+  } catch (error) {
+    console.error("Error during form submission:", error.response?.data || error.message);
+    alert(`Error: ${error.response?.data?.message || error.message}`);
+  }
+};
+
   
   
   const productCentOptions = productCent.map((product) => ({
