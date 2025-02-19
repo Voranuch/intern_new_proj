@@ -40,8 +40,19 @@ const storage = multer.diskStorage({
 
 
 const upload = multer({
-  storage: storage
-})
+  storage: storage,
+  fileFilter: (req, file, cb) => {
+    const fileTypes = /jpeg|jpg|png|pdf/;
+    const extname = fileTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimeType = fileTypes.test(file.mimetype);
+    
+    if (extname && mimeType) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Only .jpeg, .png, and .pdf files are allowed!'));
+    }
+  }
+});
 
 const db = mysql.createConnection({
     host:"localhost",
@@ -1243,10 +1254,10 @@ app.get('/getRohsOptions', (req, res) => {
   
     db.query(query, (err, result) => {
       if (err) {
-        console.error('Error fetching locations:', err);
+        console.error('Error fetching changedes:', err);
         res.status(500).send('Error fetching data');
       } else {
-        console.log('Fetched locations:', result); // Log the fetched data
+        console.log('Fetched changedes:', result); // Log the fetched data
         res.json(result); // Send the data as JSON
       }
     });
@@ -1257,10 +1268,10 @@ app.get('/getRohsOptions', (req, res) => {
   
     db.query(query, (err, result) => {
       if (err) {
-        console.error('Error fetching locations:', err);
+        console.error('Error fetching spec:', err);
         res.status(500).send('Error fetching data');
       } else {
-        console.log('Fetched locations:', result); // Log the fetched data
+        console.log('Fetched spec:', result); // Log the fetched data
         res.json(result); // Send the data as JSON
       }
     });
@@ -1275,12 +1286,39 @@ app.get('/getRohsOptions', (req, res) => {
         console.error('Error fetching locations:', err);
         res.status(500).send('Error fetching data');
       } else {
-        console.log('Fetched locations:', result); // Log the fetched data
+        console.log('Fetched model:', result); // Log the fetched data
         res.json(result); // Send the data as JSON
       }
     });
   });
 
+  const fetchData = (tableName, res) => {
+    const query = `SELECT * FROM ${tableName}`;
+    db.query(query, (err, result) => {
+      if (err) {
+        console.error(`Error fetching ${tableName}:`, err);
+        res.status(500).send('Error fetching data');
+      } else {
+        console.log(`Fetched ${tableName}:`, result);
+        res.json(result);
+      }
+    });
+  };
+  
+  app.get('/getProductCent', (req, res) => fetchData('product_cent', res));
+  app.get('/getNewPNCent', (req, res) => fetchData('newpn_cent', res));
+  app.get('/getChangeitem', (req, res) => fetchData('changeitem_cent', res));
+  app.get('/getFavlevel', (req, res) => fetchData('fav_level', res));
+  app.get('/getStation', (req, res) => fetchData('station_cent', res));
+  app.get('/getMDLPN', (req, res) => fetchData('mdl_pn_cent', res));
+  app.get('/getProtectorFPN', (req, res) => fetchData('protector_fpn', res));
+  app.get('/getProtectorRPN', (req, res) => fetchData('protector_rpn', res));
+  app.get('/getSmallFIP', (req, res) => fetchData('small_fip', res));
+  app.get('/getPCBAFIP', (req, res) => fetchData('pcba_fip', res));
+  app.get('/getSpecialAccess', (req, res) => fetchData('special_accessory', res));
+  app.get('/getAnotherLabel', (req, res) => fetchData('another_label_cent', res));
+  app.get('/getSpecialLabel', (req, res) => fetchData('special_label_cent', res));
+  app.get('/getOtherreq', (req, res) => fetchData('other_req_cent', res));
 
   app.get('/getProductData', (req, res) => {
     const { model_num } = req.query; // Access the model number from the query parameters
@@ -1465,22 +1503,192 @@ app.post("/insertFormheader", upload.single('image'), async (req, res) => {
   }
 });
 
+app.post("/submit-form", upload.array("files", 7), async (req, res) => {
+  const { formData } = req.body;
+  const files = req.files;
 
-  app.get('/customerid', (req,res)=> {
-      const sql = "SELECT * FROM customer"
-      db.query(sql, (err,data)=>{
-          if(err) return res.json(err);
-          return res.json(data);
-      })
-  })
+  const connection = await db.getConnection();
+  await connection.beginTransaction(); // Start transaction
 
-  app.get('/customerhpnid', (req,res)=> {
-    const sql = "SELECT * FROM customer_hpn"
-    db.query(sql, (err,data)=>{
-        if(err) return res.json(err);
-        return res.json(data);
-    })
-})
-  app.listen(8081, ()=> {
-      console.log("listening");
-  })
+  try {
+    // Step 1: Insert into form_header_cent and retrieve its ID
+    const [headerResult] = await connection.execute(
+      `INSERT INTO form_header_cent (submitted_by, submitted_at) VALUES (?, NOW())`,
+      [formData.submitted_by]
+    );
+    const form_header_cent_id = headerResult.insertId;
+
+    // Step 2: Insert into related tables
+    await connection.execute(
+      `INSERT INTO featuring_check (form_header_cent_id, station_id, mdl_pn_id, model_name_label)
+       VALUES (?, ?, ?, ?)`,
+      [
+        form_header_cent_id,
+        formData.station_id,
+        formData.mdl_pn_id,
+        formData.model_name_label
+      ]
+    );
+
+    await connection.execute(
+      `INSERT INTO packing_cent (form_header_cent_id, station_id, label_mb_id)
+       VALUES (?, ?, ?)`,
+      [
+        form_header_cent_id,
+        formData.station_id,
+        formData.label_mb_id
+      ]
+    );
+
+    // Step 3: Insert PSID Check Items
+    for (const item of formData.items) {
+      await connection.execute(
+        `INSERT INTO psid_check (form_header_cent_id, manual_key, scanned_psid, judge_result)
+         VALUES (?, ?, ?, ?)`,
+        [
+          form_header_cent_id,
+          item.manual_key,
+          item.scanned_psid,
+          item.judge_result
+        ]
+      );
+    }
+
+    // Step 4: Insert uploaded files
+    if (files.length > 0) {
+      const fileInserts = files.map(file => {
+        const fileType = getFileType(file.originalname);
+        return connection.execute(
+          `INSERT INTO fav_document_cent (form_header_cent_id, file_type, file_name, file_path, uploaded_by, uploaded_at)
+           VALUES (?, ?, ?, ?, ?, NOW())`,
+          [form_header_cent_id, fileType, file.originalname, file.path, formData.uploaded_by]
+        );
+      });
+
+      await Promise.all(fileInserts); // Ensure all files are saved
+    }
+
+    await connection.commit(); // Commit transaction
+    res.json({ success: true, message: "Form and files saved successfully" });
+
+  } catch (error) {
+    await connection.rollback(); // Rollback transaction on error
+    console.error(error);
+
+    if (!res.headersSent) { 
+      res.status(500).json({ success: false, message: "Error saving form", error });
+    }
+  } finally {
+    connection.release(); // Release connection
+  }
+});
+
+
+// 🔹 Function to determine file type
+function getFileType(filename) {
+  const ext = path.extname(filename).toLowerCase();
+  if (ext === ".jpeg" || ext === ".jpg" || ext === ".png") return "image";
+  if (ext === ".pdf") return "pdf";
+  return "unknown";
+}
+
+app.post("/insertCentFormheader", upload.none(), async (req, res) => {
+  console.log("Request Body:", req.body); 
+
+  try {
+    const { date, case_no, product_cent_id, model_std_id, pn, pkg_id, customer_cent, ref_doc_no, ref_draw_id, fav_level_id, change_item_id, newpn_id, time } = req.body;
+
+    const query = `
+      INSERT INTO form_header_cent (
+        date, case_no, product_cent_id, model_std_id, pn, pkg_id, customer_cent, ref_doc_no, ref_draw_id, fav_level_id, change_item_id, newpn_id, time
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+
+    console.log('Executing query:', query, [
+      date, case_no, product_cent_id, model_std_id, pn, pkg_id, customer_cent, ref_doc_no, ref_draw_id, fav_level_id, change_item_id, newpn_id, time
+    ]);
+
+    db.query(query, [
+      date, case_no, product_cent_id, model_std_id, pn, pkg_id, customer_cent, ref_doc_no, ref_draw_id, fav_level_id, change_item_id, newpn_id, time
+    ], (err, result) => {
+      if (err) {
+        console.error("Database error:", err);  
+        return res.status(500).json({ success: false, message: "Internal server error." });
+      }
+
+      const form_header_cent_id = result.insertId;
+      console.log("Query result:", result);
+
+      
+      res.status(200).json({
+        success: true,
+        form_header_cent_id, 
+        message: "Form header inserted successfully!"
+      });
+    });
+
+  } catch (error) {
+    console.error("Error processing form submission:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+app.get('/getFavFormData', async (req, res) => {
+  const { form_header_cent_id } = req.query;
+
+  if (!form_header_cent_id) {
+    return res.status(400).json({ message: "form_header_cent_id is required" });
+  }
+
+  try {
+    console.log("Fetching form data for ID:", form_header_cent_id);
+
+    const id = Number(form_header_cent_id);
+    if (isNaN(id)) {
+      console.error("Invalid form_header_cent_id:", form_header_cent_id);
+      return res.status(400).json({ message: "Invalid form_header_cent_id" });
+    }
+
+    db.query(
+      'SELECT * FROM form_header_cent WHERE form_header_cent_id = ?', 
+      [id], 
+      (error, results) => {
+        if (error) {
+          console.error("Database error:", error);
+          return res.status(500).json({ message: "Internal server error", error: error.message });
+        }
+    
+        console.log("Query result:", results);
+        
+        if (results.length > 0) {
+          res.json(results[0]);
+        } else {
+          res.status(404).json({ message: "Form not found" });
+        }
+      }
+    );
+  } catch (error) {
+    console.error("Unexpected error:", error);
+    res.status(500).json({ message: "Internal server error", error: error.message });
+  }
+});
+
+app.get('/customerid', (req, res) => {
+  const sql = "SELECT * FROM customer";
+  db.query(sql, (err, data) => {
+    if (err) return res.status(500).json(err);
+    return res.json(data);
+  });
+});
+
+app.get('/customerhpnid', (req, res) => {
+  const sql = "SELECT * FROM customer_hpn";
+  db.query(sql, (err, data) => {
+    if (err) return res.status(500).json(err);
+    return res.json(data);
+  });
+});
+
+app.listen(8081, () => {
+  console.log("Server running on port 8081");
+});
+
