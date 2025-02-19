@@ -1,11 +1,18 @@
 import React, { useState, useEffect } from "react";
+import { useLocation, useParams, useNavigate } from 'react-router-dom';
 import axios from "axios";
-import { Worker, Viewer } from '@react-pdf-viewer/core';
-import { useNavigate } from "react-router-dom";
 import '@react-pdf-viewer/core/lib/styles/index.css';
-import { Container, Form, Table, Row, Col, Button,Modal } from "react-bootstrap";
+import { Container, Form, Table, Row, Col, Button,Modal, FormControl } from "react-bootstrap";
 
 const FavForm = () => {
+    const { form_header_cent_id } = useParams();
+    const location = useLocation();
+    const navigate = useNavigate();
+    const formHeaderCentId = location.state?.form_header_cent_id || null;
+    const [formHeaderCentIdState, setFormHeaderCentIdState] = useState(formHeaderCentId);
+
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
     const [stationOptions, setStationOptions] = useState([]);
     const [modelPnOptions, setModelPnOptions] = useState([]);
     const [pfpnOptions, setFPNOptions] = useState([]);
@@ -23,7 +30,6 @@ const FavForm = () => {
     const [isFormSubmitted, setIsFormSubmitted] = useState(false);
     const [selectedImage, setSelectedImage] = useState(null);
     const [showModal, setShowModal] = useState(false);
-    const navigate = useNavigate();
 
   const categories = [
     { title: "Featuring", key: "featuring", fields: [
@@ -49,12 +55,63 @@ const FavForm = () => {
     boxComp: { box_label: '', box_id_no : '', wd_box_id: '', refer_package_id: '', special_label_id : ''},
     palletComp: { pallet_id: '',wd_pallet_id : '', wd_box_id: '', refer_package_id: '', special_label_id : ''},
     otherItems: { other_req : ''},
+    manual_key: '',
+    scanned_psid: '', 
+    judge_result: '',
+
   });
   const [teamSignatures, setTeamSignatures] = useState({
     MFG: { name: "", date: "" },
     QC: { name: "", date: "" },
     ME: { name: "", date: "" },
   });
+
+
+  useEffect(() => {
+    const fetchFormData = async () => {
+      if (!formHeaderCentId) {
+        setError("Invalid form header ID.");
+        setLoading(false);
+        return;
+      }
+  
+      try {
+        console.log("Fetching form data for ID:", formHeaderCentId);
+        const response = await axios.get("http://localhost:8081/getFavFormData", {
+          params: { form_header_cent_id: formHeaderCentId }, // ✅ Match backend param name
+        });
+  
+        if (response.data) {
+          setFormData((prevState) => ({
+            ...prevState,
+            formHeaderCentId: response.data.form_header_cent_id || '',
+            manual_key: response.data.manual_key || '',
+            scanned_psid: response.data.scanned_psid || '',
+            judge_result: response.data.judge_result || '',
+            featuring: {
+              ...prevState.featuring,
+              station_id: response.data.station_id || '',
+              mdl_pn_id: response.data.model_std_id || '',
+            },
+            packing: {
+              ...prevState.packing,
+              station_id: response.data.packing_station_id || '',
+            },
+          }));
+        }
+      } catch (err) {
+        setError("Failed to load data.");
+        console.error("Error fetching data:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+  
+    fetchFormData();
+  }, [formHeaderCentId]); 
+
+    
+
 
   useEffect(() => {
 
@@ -165,35 +222,37 @@ const FavForm = () => {
   
   const handleManualInputChange = (e, index) => {
     const updatedItems = [...items];
-    updatedItems[index].manualInput = e.target.value;
+    updatedItems[index].manual_key = e.target.value;
     setItems(updatedItems);
   };
   
   const handleScanInputChange = (e, index) => {
     const updatedItems = [...items];
-    updatedItems[index].scannedBarcode = e.target.value;
-    setItems(updatedItems);
-  };
-  
-  const handleJudgeChange = (e, index) => {
-    const updatedItems = [...items];
-    updatedItems[index].judge = e.target.value;
+    updatedItems[index].scanned_psid = e.target.value;
     setItems(updatedItems);
   };
   
   const getResult = (item) => {
-    // Example logic for OK/NG based on manual input and scanned barcode
-    if (item.manualInput && item.scannedBarcode) {
-      return item.manualInput === item.scannedBarcode ? 'OK' : 'NG';
-    }else if (!item.manualInput === "N/A"){
+    const manualKey = item.manual_key.toUpperCase();
+    const scannedPsid = item.scanned_psid.toUpperCase();
+  
 
+    if (manualKey === 'N/A' && scannedPsid === 'N/A') {
+      return 'N/A';
+    }else if (!manualKey || !scannedPsid) {
+      return 'N/A';
+    }else if (manualKey === scannedPsid) {
+      return 'OK';
+    } else {
+      return 'NG';
     }
-    return 'Pending';
   };
+  
 
   return (
     <Container style={{ fontFamily: 'var(--font-family)', fontWeight:"bold" , marginTop:"50px"}}>
       <h2 className="text-center my-4">Form Submission</h2>
+      <p>Form Header Cent ID: {formHeaderCentId}</p>
       <Table bordered className="mt-3">
         <thead>
             <tr>
@@ -204,31 +263,31 @@ const FavForm = () => {
             </tr>
         </thead>
         <tbody>
-    {items.map((item, index) => (
-      <tr key={index}>
-        <td>
-          PSID
-        </td>
-        <td>
-          <input 
-            type="text" 
-            value={item.manualInput || ''} 
-            onChange={(e) => handleManualInputChange(e, index)} 
-            placeholder="Enter Manual Key"
-          />
-        </td>
-        <td>
-          <input 
-            type="text" 
-            value={item.scannedBarcode || ''} 
-            onChange={(e) => handleScanInputChange(e, index)} 
-            placeholder="Scan PSID Barcode"
-          />
-        </td>
+        {items.map((item, index) => (
+            <tr key={index}>
+                <td>
+                    PSID
+                </td>
+                <td>
+                    <FormControl
+                        type="text" 
+                        value={item.manual_key || ''} 
+                        onChange={(e) => handleManualInputChange(e, index)} 
+                        placeholder="Enter Manual Key"
+                    />
+                </td>
+            <td>
+                <FormControl 
+                    type="text" 
+                    value={item.scanned_psid || ''} 
+                    onChange={(e) => handleScanInputChange(e, index)} 
+                    placeholder="Scan PSID Barcode"
+                />
+            </td>
 
-        <td>
-          <span>{getResult(item)}</span> {/* Function to determine OK/NG */}
-        </td>
+            <td>
+            <span>{getResult(item)}</span> {/* Function to determine OK/NG */}
+            </td>
       </tr>
     ))}
   </tbody>
@@ -256,7 +315,7 @@ const FavForm = () => {
                       <Form.Select onChange={(e) => handleInputChange(key, field, e.target.value)}>
                         <option value="">Select Station</option>
                         {stationOptions.map((station) => (
-                          <option key={station.id} value={station.station_id}>{station.station_name}</option>
+                            <option key={station.station_id} value={station.station_id}>{station.station_name}</option>
                         ))}
                       </Form.Select>
                     ) : field === "Model Label P/N" ? (
@@ -340,21 +399,21 @@ const FavForm = () => {
                       <Form.Control type="text" onChange={(e) => handleInputChange(key, field, e.target.value)} />
                     )}
                   </td>
-                  {index === 0 && (
-              <td rowSpan={fields.length} style={{ verticalAlign: "middle" }}>
-                {teamSignatures.MFG.name && `${teamSignatures.MFG.name} (${teamSignatures.MFG.date})`}
-              </td>
-            )}
-            {index === 0 && (
-              <td rowSpan={fields.length} style={{ verticalAlign: "middle" }}>
-                {teamSignatures.QC.name && `${teamSignatures.QC.name} (${teamSignatures.QC.date})`}
-              </td>
-            )}
-            {index === 0 && (
-              <td rowSpan={fields.length} style={{ verticalAlign: "middle" }}>
-                {teamSignatures.ME.name && `${teamSignatures.ME.name} (${teamSignatures.ME.date})`}
-              </td>
-            )}
+                    {index === 0 && (
+                    <td rowSpan={fields.length} style={{ verticalAlign: "middle" }}>
+                        {teamSignatures.MFG.name && `${teamSignatures.MFG.name} (${teamSignatures.MFG.date})`}
+                    </td>
+                    )}
+                    {index === 0 && (
+                    <td rowSpan={fields.length} style={{ verticalAlign: "middle" }}>
+                        {teamSignatures.QC.name && `${teamSignatures.QC.name} (${teamSignatures.QC.date})`}
+                    </td>
+                    )}
+                    {index === 0 && (
+                    <td rowSpan={fields.length} style={{ verticalAlign: "middle" }}>
+                        {teamSignatures.ME.name && `${teamSignatures.ME.name} (${teamSignatures.ME.date})`}
+                    </td>
+                    )}
                 </tr>
               ))}
             </React.Fragment>
@@ -377,45 +436,44 @@ const FavForm = () => {
           </div>
         ))}
         </Form.Group> 
-<Table bordered className="mt-3">
-  <thead>
-    <tr>
-      <th>File Name</th>
-      <th>File </th>
-      <th>Open</th>
-      <th>Remove</th>
-    </tr>
-  </thead>
-  <tbody>
-  {uploadedFiles.map((fileObj, index) => (
-    <tr key={index}>
-      <td>{fileObj.file.name}</td>
-      <td>{fileObj.category}</td>
-      <td>
-        <Button variant="link" onClick={() => handleFileClick(fileObj.file)}>
-          Open
-        </Button>
-      </td>
-      <td>
-        <Button variant="danger" size="sm" onClick={() => handleRemoveFile(index)}>
-          Remove
-        </Button>
-      </td>
-    </tr>
-  ))}
-</tbody>
+    <Table bordered className="mt-3">
+        <thead>
+            <tr>
+            <th>File Name</th>
+            <th>File </th>
+            <th>Open</th>
+            <th>Remove</th>
+            </tr>
+        </thead>
+    <tbody>
+        {uploadedFiles.map((fileObj, index) => (
+            <tr key={index}>
+            <td>{fileObj.file.name}</td>
+            <td>{fileObj.category}</td>
+            <td>
+                <Button variant="link" onClick={() => handleFileClick(fileObj.file)}>
+                Open
+                </Button>
+            </td>
+            <td>
+                <Button variant="danger" size="sm" onClick={() => handleRemoveFile(index)}>
+                Remove
+                </Button>
+            </td>
+            </tr>
+        ))}
+    </tbody>
 
-</Table>
+    </Table>
 
-{/* File Viewer Modal */}
-<Modal show={showModal} onHide={() => setShowModal(false)} centered>
-    <Modal.Header closeButton>
-        <Modal.Title>Image Preview</Modal.Title>
-    </Modal.Header>
-    <Modal.Body className="text-center">
-        {selectedImage && <img src={selectedImage} alt="Preview" style={{ maxWidth: "100%" }} />}
-    </Modal.Body>
-</Modal>
+    <Modal show={showModal} onHide={() => setShowModal(false)} centered>
+        <Modal.Header closeButton>
+            <Modal.Title>Image Preview</Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="text-center">
+            {selectedImage && <img src={selectedImage} alt="Preview" style={{ maxWidth: "100%" }} />}
+        </Modal.Body>
+    </Modal>
 
       <h4>Team Signatures</h4>
       <Table bordered>
